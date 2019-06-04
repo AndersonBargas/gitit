@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -11,7 +12,20 @@ import (
 	"time"
 )
 
+const configFile = "gitit.json"
+
+var (
+	appConfig configStruct
+)
+
+type configStruct struct {
+	data1 []string
+	data2 []string
+}
+
 func main() {
+	loadConfigFile()
+
 	branchName := getBranchName()
 	fmt.Println("Checked on", branchName)
 
@@ -72,6 +86,19 @@ func getRemoteHash() string {
 		log.Fatalf("Error obtaining the remote hash")
 	}
 	return remoteHash
+}
+
+func loadConfigFile() {
+	cfgFile, err := os.Open(configFile)
+	if err != nil {
+		log.Fatalf("Error loading the configuration file")
+	}
+	defer cfgFile.Close()
+	jsonDecoder := json.NewDecoder(cfgFile)
+	err = jsonDecoder.Decode(&appConfig)
+	if err != nil {
+		log.Fatalf("Error parsing the configuration file")
+	}
 }
 
 func rebuild() {
