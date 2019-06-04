@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -19,7 +20,6 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 	signal.Notify(quit, syscall.SIGTERM)
 
-	//go func() {
 	for {
 		select {
 		case <-ticker.C:
@@ -38,7 +38,6 @@ func main() {
 			return
 		}
 	}
-	//}()
 }
 
 func execGitCommand(args ...string) (string, error) {
@@ -52,17 +51,26 @@ func execGitCommand(args ...string) (string, error) {
 }
 
 func getBranchName() string {
-	branchName, _ := execGitCommand("rev-parse", "--abbrev-ref", "HEAD")
+	branchName, err := execGitCommand("rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		log.Fatalf("Error obtaining the branch name")
+	}
 	return branchName
 }
 
 func getLocalHash() string {
-	localHash, _ := execGitCommand("rev-parse", "HEAD")
+	localHash, err := execGitCommand("rev-parse", "HEAD")
+	if err != nil {
+		log.Fatalf("Error obtaining the local hash")
+	}
 	return localHash
 }
 
 func getRemoteHash() string {
-	remoteHash, _ := execGitCommand("rev-parse", "master@{upstream}")
+	remoteHash, err := execGitCommand("rev-parse", "master@{upstream}")
+	if err != nil {
+		log.Fatalf("Error obtaining the remote hash")
+	}
 	return remoteHash
 }
 
