@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -12,30 +14,64 @@ import (
 	"time"
 )
 
-const configFile = "gitit.json"
+var currentConfig config
 
-var (
-	appConfig configStruct
-)
-
-type configStruct struct {
-	data1 []string
-	data2 []string
+type config struct {
+	General struct {
+		CheckIntervalSeconds uint   `json:"checkIntervalSeconds"`
+		ContextPath          string `json:"contextPath"`
+	} `json:"general"`
+	Git struct {
+		BinaryPath                     string `json:"binaryPath"`
+		ConsecutiveGitErrorsBeforeStop uint   `json:"consecutiveGitErrorsBeforeStop"`
+		LocalCommandsTimeout           uint   `json:"localCommandsTimeout"`
+		OriginCommandsTimeout          uint   `json:"originCommandsTimeout"`
+		ResetBeforePull                bool   `json:"resetBeforePull"`
+	} `json:"git"`
+	Rebuild struct {
+		ConsecutiveBuildErrorsBeforeStop uint `json:"consecutiveBuildErrorsBeforeStop"`
+		Commands                         []struct {
+			Command string `json:"command"`
+			Timeout uint   `json:"timeout"`
+		} `json:"commands"`
+	} `json:"rebuild"`
 }
 
 func main() {
-	loadConfigFile()
+	/** Flags **/
+	generateConfigFile := flag.Bool("gc", false, "generates a config file and exit")
+	flag.Parse()
 
+	/** Configuration **/
+	const configFilePath = "gitit.json"
+	if *generateConfigFile == true {
+		currentConfig = newDefaultConfig()
+		err := saveConfigFile(configFilePath)
+		log.Println("Exiting...")
+		if err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	cfg, err := loadConfigFromFile(configFilePath)
+	if err != nil {
+		cfg = newDefaultConfig()
+	}
+	currentConfig = cfg
+
+	/** Git **/
 	branchName := getBranchName()
-	fmt.Println("Checked on", branchName)
+	log.Print("Checked on branch ", branchName)
 
-	ticker := time.NewTicker(10 * time.Second)
+	interval := time.Duration(currentConfig.General.CheckIntervalSeconds)
+	ticker := time.NewTicker(interval * time.Second)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
 	signal.Notify(quit, syscall.SIGTERM)
 
 	for {
 		select {
+		/** Loop **/
 		case <-ticker.C:
 			localHash := getLocalHash()
 			remoteHash := getRemoteHash()
@@ -44,10 +80,11 @@ func main() {
 				rebuild()
 
 			}
+		/** Gracefully shutdown **/
 		case <-quit:
 			ticker.Stop()
 			fmt.Print("\r")
-			fmt.Print("Git-it stopped.", "Exiting...")
+			log.Print("Git-it stopped.", "Exiting...")
 			os.Exit(0)
 			return
 		}
@@ -88,23 +125,75 @@ func getRemoteHash() string {
 	return remoteHash
 }
 
-func loadConfigFile() {
-	cfgFile, err := os.Open(configFile)
+func loadConfigFromFile(filePath string) (config, error) {
+	loadedConfig := config{}
+	log.Printf("Trying to load config from file...\n")
+	configResource, err := os.Open(filePath)
 	if err != nil {
-		log.Fatalf("Error loading the configuration file")
+		log.Printf("Error loading the configuration file\n")
+		return loadedConfig, err
 	}
-	defer cfgFile.Close()
-	jsonDecoder := json.NewDecoder(cfgFile)
-	err = jsonDecoder.Decode(&appConfig)
+	defer configResource.Close()
+	log.Printf("Parsing the config loaded from file...\n")
+	jsonDecoder := json.NewDecoder(configResource)
+	err = jsonDecoder.Decode(&loadedConfig)
 	if err != nil {
-		log.Fatalf("Error parsing the configuration file")
+		log.Printf("Error parsing the configuration file")
+		return loadedConfig, err
 	}
+	log.Printf("Config succesfully loaded from file")
+	return loadedConfig, nil
+}
+
+func newDefaultConfig() config {
+	log.Printf("Initializing with default configuration")
+	defaultConfig := config{}
+	defaultJSON := `{
+		"general": {
+			"checkIntervalSeconds": 10,
+			"contextPath": "."
+		},
+		"git": {
+			"binaryPath": "",
+			"consecutiveGitErrorsBeforeStop": 3,
+			"localCommandsTimeout": 2,
+			"originCommandsTimeout": 10,
+			"resetBeforePull": true
+		},
+		"rebuild": {
+			"consecutiveBuildErrorsBeforeStop": 5,
+			"commands": [
+				{
+					"command": "go version",
+					"timeout": 0
+				}
+			]
+		}
+	}`
+	json.Unmarshal([]byte(defaultJSON), &defaultConfig)
+	return defaultConfig
 }
 
 func rebuild() {
 	fmt.Println("Hash changed.", "Buiding...")
 	buildCMD := exec.Command("go", "build")
 	_, _ = buildCMD.Output()
+}
+
+func saveConfigFile(filePath string) error {
+	configResource, err := json.MarshalIndent(currentConfig, "", "    ")
+	if err != nil {
+		log.Println("Error while encoding the configuration to be saved in a file")
+		return err
+	}
+
+	err = ioutil.WriteFile(filePath, configResource, 0644)
+	if err != nil {
+		log.Println("Error while saving the configuration file")
+		return err
+	}
+	log.Println("Configuration file succesfully generated")
+	return nil
 }
 
 func updateLocalBranch() {
