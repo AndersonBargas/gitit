@@ -78,7 +78,6 @@ func main() {
 			if localHash != remoteHash {
 				updateLocalBranch()
 				rebuild()
-
 			}
 		/** Gracefully shutdown **/
 		case <-quit:
@@ -176,8 +175,17 @@ func newDefaultConfig() config {
 
 func rebuild() {
 	fmt.Println("Hash changed.", "Buiding...")
-	buildCMD := exec.Command("go", "build")
-	_, _ = buildCMD.Output()
+	commands := currentConfig.Rebuild.Commands
+	for _, cmd := range commands {
+		// buildCMD := exec.Command(cmd.Command)
+		// out, _ = buildCMD.Output()
+		out, err := exec.Command(cmd.Command).Output()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Build output: %s\n", out)
+	}
+
 }
 
 func saveConfigFile(filePath string) error {
