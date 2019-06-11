@@ -75,10 +75,16 @@ func main() {
 		case <-ticker.C:
 			localHash := getLocalHash()
 			remoteHash := getRemoteHash()
-			if localHash != remoteHash {
-				updateLocalBranch()
-				rebuild()
+			if localHash == remoteHash {
+				log.Print("Same hash, nothing changed...")
+				continue
 			}
+			log.Println("Hash changed.")
+			if currentConfig.Git.ResetBeforePull {
+				resetLocalBranch()
+			}
+			updateLocalBranch()
+			rebuild()
 		/** Gracefully shutdown **/
 		case <-quit:
 			ticker.Stop()
@@ -174,7 +180,7 @@ func newDefaultConfig() config {
 }
 
 func rebuild() {
-	fmt.Println("Hash changed.", "Buiding...")
+	log.Println("Rebuilding...")
 	commands := currentConfig.Rebuild.Commands
 	for _, cmd := range commands {
 		// buildCMD := exec.Command(cmd.Command)
@@ -183,9 +189,15 @@ func rebuild() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Build output: %s\n", out)
+		log.Printf("Build output: %s\n", out)
 	}
 
+}
+
+func resetLocalBranch() {
+	log.Println("Reseting local branch...")
+	execGitCommand("reset", "--hard")
+	log.Println("Local branch succesfully reseted")
 }
 
 func saveConfigFile(filePath string) error {
@@ -205,5 +217,6 @@ func saveConfigFile(filePath string) error {
 }
 
 func updateLocalBranch() {
+	log.Println("Updating local branch...")
 	execGitCommand("pull")
 }
