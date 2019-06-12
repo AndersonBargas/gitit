@@ -62,7 +62,10 @@ func main() {
 	currentConfig = cfg
 
 	if *dryRun == true {
-		rebuild()
+		err = rebuild()
+		if err != nil {
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
@@ -91,6 +94,7 @@ func main() {
 				resetLocalBranch()
 			}
 			updateLocalBranch()
+			// err = rebuild()
 			rebuild()
 		/** Gracefully shutdown **/
 		case <-quit:
@@ -186,7 +190,7 @@ func newDefaultConfig() config {
 	return defaultConfig
 }
 
-func rebuild() {
+func rebuild() error {
 	log.Println("Rebuilding...")
 	commands := currentConfig.Rebuild.Commands
 	for _, cmd := range commands {
@@ -194,10 +198,12 @@ func rebuild() {
 		buildCMD := exec.Command(parts[0], parts[1:]...)
 		out, err := buildCMD.Output()
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Error while running a build command")
+			return err
 		}
 		log.Printf("Build output: %s\n", out)
 	}
+	return nil
 
 }
 
