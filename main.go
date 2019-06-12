@@ -193,7 +193,7 @@ func rebuild() {
 		parts := strings.Fields(cmd.Command)
 		// buildCMD := exec.Command(cmd.Command)
 		// out, _ = buildCMD.Output()
-		out, err := exec.Command(parts[0:1][0], parts[1:]...).Output()
+		out, err := exec.Command(parts[0], parts[1:]...).Output()
 		if err != nil {
 			log.Fatal(err)
 		}
