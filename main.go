@@ -191,9 +191,8 @@ func rebuild() {
 	commands := currentConfig.Rebuild.Commands
 	for _, cmd := range commands {
 		parts := strings.Fields(cmd.Command)
-		// buildCMD := exec.Command(cmd.Command)
-		// out, _ = buildCMD.Output()
-		out, err := exec.Command(parts[0], parts[1:]...).Output()
+		buildCMD := exec.Command(parts[0], parts[1:]...)
+		out, err := buildCMD.Output()
 		if err != nil {
 			log.Fatal(err)
 		}
