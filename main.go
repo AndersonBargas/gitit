@@ -39,6 +39,7 @@ type config struct {
 
 func main() {
 	/** Flags **/
+	dryRun := flag.Bool("dr", false, "run the build commands and exit")
 	generateConfigFile := flag.Bool("gc", false, "generates a config file and exit")
 	flag.Parse()
 
@@ -53,11 +54,17 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
 	cfg, err := loadConfigFromFile(configFilePath)
 	if err != nil {
 		cfg = newDefaultConfig()
 	}
 	currentConfig = cfg
+
+	if *dryRun == true {
+		rebuild()
+		os.Exit(0)
+	}
 
 	/** Git **/
 	branchName := getBranchName()
@@ -183,9 +190,10 @@ func rebuild() {
 	log.Println("Rebuilding...")
 	commands := currentConfig.Rebuild.Commands
 	for _, cmd := range commands {
+		parts := strings.Fields(cmd.Command)
 		// buildCMD := exec.Command(cmd.Command)
 		// out, _ = buildCMD.Output()
-		out, err := exec.Command(cmd.Command).Output()
+		out, err := exec.Command(parts[0:1][0], parts[1:]...).Output()
 		if err != nil {
 			log.Fatal(err)
 		}
