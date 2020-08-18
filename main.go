@@ -194,14 +194,39 @@ func rebuild() error {
 	log.Println("Rebuilding...")
 	commands := currentConfig.Rebuild.Commands
 	for _, cmd := range commands {
+		done := make(chan error, 1)
+
 		parts := strings.Fields(cmd.Command)
 		buildCMD := exec.Command(parts[0], parts[1:]...)
-		out, err := buildCMD.Output()
-		if err != nil {
-			log.Println("Error while running a build command")
-			return err
+
+		go func() {
+			done <- buildCMD.Wait()
+		}()
+
+		select {
+		case <-time.After(3 * time.Second):
+			err := buildCMD.Process.Kill()
+			if err == nil {
+				log.Println("Failed to kill")
+				return err
+			}
+			log.Println("Timeout reached. Process killed")
+			break
+		case err := <-done:
+			if err == nil {
+				log.Printf("Process finished with error %v\n", err)
+				return err
+			}
+			out, _ := buildCMD.Output()
+			log.Printf("Build output: %s\n", out)
 		}
-		log.Printf("Build output: %s\n", out)
+
+		// out, err := buildCMD.Output()
+		// if err != nil {
+		// 	log.Println("Error while running a build command")
+		// 	return err
+		// }
+		// log.Printf("Build output: %s\n", out)
 	}
 	return nil
 
